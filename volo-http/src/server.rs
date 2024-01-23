@@ -17,9 +17,8 @@ use tracing::{info, trace};
 use volo::net::{conn::Conn, incoming::Incoming, Address, MakeIncoming};
 
 use crate::{
-    param::Params,
+    context::ServerContext,
     response::{IntoResponse, RespBody, Response},
-    HttpContext,
 };
 
 pub struct Server<S, L> {
@@ -31,7 +30,7 @@ pub struct Server<S, L> {
 impl<S> Server<S, Identity> {
     pub fn new(service: S) -> Self
     where
-        S: Service<HttpContext, BodyIncoming, Response = Response, Error = Infallible>,
+        S: Service<ServerContext, BodyIncoming, Response = Response, Error = Infallible>,
     {
         Self {
             service,
@@ -94,9 +93,9 @@ impl<S, L> Server<S, L> {
 
     pub async fn run<MI: MakeIncoming>(self, mk_incoming: MI) -> Result<(), BoxError>
     where
-        S: Service<HttpContext, BodyIncoming, Response = Response, Error = Infallible>,
+        S: Service<ServerContext, BodyIncoming, Response = Response, Error = Infallible>,
         L: Layer<S>,
-        L::Service: Service<HttpContext, BodyIncoming, Response = Response, Error = Infallible>
+        L::Service: Service<ServerContext, BodyIncoming, Response = Response, Error = Infallible>
             + Send
             + Sync
             + 'static,
@@ -126,7 +125,12 @@ impl<S, L> Server<S, L> {
                 }
                 match incoming.accept().await {
                     Ok(Some(conn)) => {
-                        let peer = conn.info.peer_addr.clone().unwrap();
+                        let peer = conn
+                            .info
+                            .peer_addr
+                            .clone()
+                            .expect("http address should have one");
+
                         trace!("[VOLO] accept connection from: {:?}", peer);
                         conn_cnt.fetch_add(1, Ordering::Relaxed);
 
@@ -235,7 +239,7 @@ async fn handle_conn<S>(
     conn_cnt: Arc<std::sync::atomic::AtomicUsize>,
     peer: Address,
 ) where
-    S: Service<HttpContext, BodyIncoming, Response = Response, Error = Infallible>
+    S: Service<ServerContext, BodyIncoming, Response = Response, Error = Infallible>
         + Clone
         + Send
         + Sync
@@ -251,16 +255,7 @@ async fn handle_conn<S>(
             let peer = peer.clone();
             async move {
                 let (parts, req) = req.into_parts();
-                let req = req.into();
-                let mut cx = HttpContext {
-                    peer,
-                    method: parts.method,
-                    uri: parts.uri,
-                    version: parts.version,
-                    headers: parts.headers,
-                    extensions: parts.extensions,
-                    params: Params::default(),
-                };
+                let mut cx = ServerContext::new(peer, parts);
                 let resp = match service.call(&mut cx, req).await {
                     Ok(resp) => resp,
                     Err(inf) => inf.into_response(),

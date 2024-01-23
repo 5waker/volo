@@ -63,7 +63,7 @@ http-body = "1"
 http-body-util = "0.1"
 hyper = "1"
 hyper-timeout = "0.5"
-hyper-util = "0.1.2"
+hyper-util = "0.1"
 itertools = "0"
 lazy_static = "1"
 libc = "0.2"
@@ -115,6 +115,7 @@ walkdir = "2"
 # Optional dependencies
 librustls = { package = "rustls", version = "0.22" }
 rustls-pemfile = "2"
+rustls-pki-types = "1"
 tokio-rustls = "0.25"
 tokio-native-tls = "0.3"
 

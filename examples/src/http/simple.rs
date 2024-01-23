@@ -11,8 +11,8 @@ use volo_http::{
     middleware::{self, Next},
     response::IntoResponse,
     route::{from_handler, get, post, service_fn, MethodRouter, Router},
-    Address, BodyIncoming, ConnectionInfo, CookieJar, HttpContext, Json, MaybeInvalid, Method,
-    Params, Response, Server, StatusCode, Uri,
+    Address, BodyIncoming, ConnectionInfo, CookieJar, Json, MaybeInvalid, Method, Params, Response,
+    Server, ServerContext, StatusCode, Uri,
 };
 
 async fn hello() -> &'static str {
@@ -37,7 +37,7 @@ async fn json_get() -> Json<Person> {
 async fn json_post(Json(request): Json<Person>) -> String {
     let first_phone = request
         .phones
-        .get(0)
+        .first()
         .map(|p| p.as_str())
         .unwrap_or("no number");
     format!(
@@ -55,7 +55,7 @@ async fn json_post_with_check(request: Option<Json<Person>>) -> Result<String, S
     };
     let first_phone = request
         .phones
-        .get(0)
+        .first()
         .map(|p| p.as_str())
         .unwrap_or("no number");
     Ok(format!(
@@ -118,7 +118,10 @@ async fn extension(Extension(state): Extension<Arc<State>>) -> String {
     format!("State {{ foo: {}, bar: {} }}\n", state.foo, state.bar)
 }
 
-async fn service_fn_test(cx: &mut HttpContext, req: BodyIncoming) -> Result<Response, Infallible> {
+async fn service_fn_test(
+    cx: &mut ServerContext,
+    req: BodyIncoming,
+) -> Result<Response, Infallible> {
     Ok(format!("cx: {cx:?}, req: {req:?}").into_response())
 }
 
@@ -222,7 +225,7 @@ async fn tracing_from_fn(
     uri: Uri,
     peer: Address,
     cookie_jar: CookieJar,
-    cx: &mut HttpContext,
+    cx: &mut ServerContext,
     req: BodyIncoming,
     next: Next,
 ) -> Response {
